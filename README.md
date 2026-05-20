@@ -26,7 +26,7 @@ The framework is evaluated across continuous-control benchmarks and real-world r
 # Core Idea
 
 <p align="center">
-  <img src="assets/explore-exploit-repeat.png" width="90%">
+  <img src="assets/exploration-explotation-repetition.png" width="90%">
 </p>
 
 Traditional RL alternates between:
@@ -47,7 +47,7 @@ Unlike replay buffers that reuse transitions only during optimisation, repetitio
 ## Instant Episode Repetition (IER)
 
 <p align="center">
-  <img src="assets/ier-framework.png" width="80%">
+  <img src="assets/IER.png" width="80%">
 </p>
 
 IER immediately re-executes newly discovered high-reward episodes.
@@ -64,7 +64,7 @@ IER immediately re-executes newly discovered high-reward episodes.
 ## Spaced Episode Repetition (SER)
 
 <p align="center">
-  <img src="assets/ser-framework.png" width="85%">
+  <img src="assets/SER.png" width="85%">
 </p>
 
 SER introduces temporally spaced behavioural reuse using a dedicated episodic memory called:
