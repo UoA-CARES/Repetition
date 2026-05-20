@@ -1,0 +1,133 @@
+\begin{figure}[htbp]
+\centering
+\resizebox{0.92\linewidth}{!}{%
+\begin{tikzpicture}[
+    font=\small\bfseries,
+    node distance=1.15cm and 2.2cm,
+    baseNode/.style={
+        rectangle,
+        rounded corners,
+        draw=repPurple,
+        very thick,
+        minimum width=4.2cm,
+        minimum height=0.95cm,
+        align=center
+    },
+    expNode/.style={
+        baseNode,
+        draw=expRed,
+        fill=expRed!15
+    },
+    trainNode/.style={
+        baseNode,
+        draw=trainGreen,
+        fill=trainGreen!18
+    },
+    repNode/.style={
+        baseNode,
+        draw=repPurple,
+        fill=repPurple!15
+    },
+    processNode/.style={
+        baseNode,
+        fill=gray!10
+    },
+    term/.style={
+        ellipse,
+        draw=repPurple,
+        very thick,
+        minimum width=1.8cm,
+        minimum height=0.75cm,
+        align=center
+    },
+    decision/.style={
+        diamond,
+        aspect=2,
+        draw=repPurple,
+        very thick,
+        align=center,
+        inner sep=1pt,
+        fill=white
+    },
+    arrowStyle/.style={->, thick, repPurple},
+    >=Stealth
+]
+
+% Start
+\node[term] (start) {Start};
+
+% Exploration
+\node[expNode, below=1.0cm of start] (explore)
+{Exploration phase\\\scriptsize Select random actions};
+
+\node[decision, below=1.05cm of explore] (exp_done)
+{\scriptsize Exploration\\\scriptsize finished?};
+
+% Repetition active decision
+\node[decision, below=1.2cm of exp_done] (rep_active)
+{\scriptsize Repetition\\\scriptsize active?};
+
+% Action nodes
+\node[trainNode, below=1.15cm of rep_active] (policy_action)
+{Exploitation phase\\\scriptsize Action from policy};
+
+\node[repNode, right=2.4cm of policy_action] (saved_action)
+{Repetition phase\\\scriptsize Action from stored episode};
+
+% Environment step
+\node[processNode, below=1.15cm of policy_action] (step_store)
+{Step environment\\Store transition\\Update policy};
+
+% Episode finished
+\node[decision, below=1.15cm of step_store] (ep_end)
+{\scriptsize Episode\\\scriptsize finished?};
+
+% Update repetition status
+\node[processNode, below=1.15cm of ep_end] (rep_update)
+{Update repetition status};
+
+% Training finished
+\node[decision, below=1.15cm of rep_update] (train_done)
+{\scriptsize Training\\\scriptsize finished?};
+
+\node[term, below=1.15cm of train_done] (end) {End};
+
+% Arrows
+\draw[arrowStyle] (start) -- (explore);
+
+\draw[arrowStyle] (explore) -- node[right,font=\footnotesize\bfseries] {after each step} (exp_done);
+
+\draw[arrowStyle] (exp_done.east) to[out=0,in=0,looseness=1.05]
+node[right,font=\footnotesize\bfseries] {no} (explore.east);
+
+\draw[arrowStyle] (exp_done) -- node[right,font=\footnotesize\bfseries] {yes} (rep_active);
+
+\draw[arrowStyle] (rep_active) -- node[left,font=\footnotesize\bfseries] {no} (policy_action);
+
+\draw[arrowStyle] (rep_active.east) -| node[pos=0.25,above,font=\footnotesize\bfseries] {yes} (saved_action.north);
+
+\draw[arrowStyle] (policy_action) -- (step_store);
+
+\draw[arrowStyle] (saved_action.south) |- ([xshift=3pt]step_store.east);
+
+\draw[arrowStyle] (step_store) -- (ep_end);
+
+\draw[arrowStyle] (ep_end.west) to[out=180,in=180,looseness=1.0]
+node[left,font=\footnotesize\bfseries] {no} (rep_active.west);
+
+\draw[arrowStyle] (ep_end) -- node[right,font=\footnotesize\bfseries] {yes} (rep_update);
+
+\draw[arrowStyle] (rep_update) -- (train_done);
+
+\draw[arrowStyle] (train_done) -- node[right,font=\footnotesize\bfseries] {yes} (end);
+
+\draw[arrowStyle] (train_done.west) to[out=180,in=180,looseness=1.0]
+node[left,font=\footnotesize\bfseries] {no} (rep_active.west);
+
+\end{tikzpicture}%
+}
+\caption[RL training with episode repetition]{
+High-level control flow of RL training with episode repetition. Following exploration, the agent interacts with the environment using a standard off-policy algorithm. When a repetition trigger is satisfied, a selected high-value episode is re-executed for $R_{\text{N}}$ episodes, reinforcing successful behaviour before returning to policy-driven interaction.
+}
+\label{fig:repetition-architecture}
+\end{figure}
