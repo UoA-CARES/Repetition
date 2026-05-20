@@ -1,15 +1,5 @@
 # Repetition-RL
 
-<p align="center">
-  <img src="assets/repetition-framework.png" width="85%">
-</p>
-
-<p align="center">
-<b>Repetition-based Reinforcement Learning Framework</b><br>
-Integrating behavioural repetition directly into RL interaction through Immediate Episode Repetition (IER) and the Spaced Episode Repetition (SER) family.
-</p>
-
----
 
 ## Overview
 
