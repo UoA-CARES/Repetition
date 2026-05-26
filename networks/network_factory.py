@@ -4,23 +4,23 @@ Factory for creating algorithm networks.
 
 import torch
 
-from algorithms.base.td3 import TD3
 from algorithms.base.sac import SAC
+from algorithms.base.td3 import TD3
 
+from algorithms.repetition.resac import ReSAC
 from algorithms.repetition.retd3 import ReTD3
-from algorithms.repetition.resac import RESAC
 
-from algorithms.sil.sil_td3 import SILTD3
 from algorithms.sil.sil_sac import SILSAC
-
-from networks.td3_networks import (
-    Actor as TD3Actor,
-    Critic as TD3Critic,
-)
+from algorithms.sil.sil_td3 import SILTD3
 
 from networks.sac_networks import (
     Actor as SACActor,
     Critic as SACCritic,
+)
+
+from networks.td3_networks import (
+    Actor as TD3Actor,
+    Critic as TD3Critic,
 )
 
 
@@ -149,10 +149,10 @@ class NetworkFactory:
             )
 
         # =========================================================
-        # RESAC
+        # ReSAC
         # =========================================================
 
-        if algorithm_name == "RESAC":
+        if algorithm_name == "ReSAC":
 
             actor = SACActor(
                 observation_size,
@@ -164,7 +164,7 @@ class NetworkFactory:
                 action_num,
             )
 
-            return RESAC(
+            return ReSAC(
                 actor_network=actor,
                 critic_network=critic,
                 gamma=config.gamma,
