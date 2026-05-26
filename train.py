@@ -4,6 +4,9 @@ Main training entry point for Repetition-RL.
 Example:
     python train.py run --gym openai --task HalfCheetah-v4 TD3
 
+SIL example:
+    python train.py run --gym openai --task HalfCheetah-v4 TD3SIL
+
 IER example:
     REPETITION_FRAMEWORK=IER SELECTION_STRATEGY=episode_reward \
     python train.py run --gym openai --task HalfCheetah-v4 ReTD3
@@ -15,7 +18,6 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from utils.record import Record
 
 import torch
 import yaml
@@ -37,6 +39,7 @@ from utils.configurations import (
     TD3SILConfig,
     TrainingConfig,
 )
+from utils.record import Record
 
 logging.basicConfig(level=logging.INFO)
 
@@ -45,11 +48,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train Repetition-RL agents.")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
-
     run_parser = subparsers.add_parser("run")
 
     run_parser.add_argument("algorithm", type=str)
-
     run_parser.add_argument("--gym", type=str, default="openai")
     run_parser.add_argument("--task", type=str, default="Pendulum-v1")
     run_parser.add_argument("--domain", type=str, default="")
@@ -82,7 +83,7 @@ def get_algorithm_config(algorithm):
 
 
 def get_memory(alg_config):
-    if alg_config.algorithm in ["ReTD3", "ReSAC", "TD3SIL", "SACSIL"]:
+    if alg_config.algorithm in ["ReTD3", "ReSAC"]:
         return EpisodicMemory(
             replay_capacity=alg_config.buffer_size,
             vem_capacity=int(os.getenv("VEM_CAPACITY", 500)),
@@ -94,9 +95,7 @@ def get_memory(alg_config):
 def get_training_loop(alg_config):
     repetition_framework, selection_strategy = get_repetition_config()
 
-    repetition_algorithms = ["ReTD3", "ReSAC", "TD3SIL", "SACSIL"]
-
-    if alg_config.algorithm in repetition_algorithms:
+    if alg_config.algorithm in ["ReTD3", "ReSAC"]:
         if repetition_framework == "IER" and selection_strategy == "episode_reward":
             return ier_episode_reward_loop, "ier_episode_reward"
 
@@ -114,7 +113,7 @@ def log_config(title, config):
         f"{title}\n"
         "---------------------------------------------------"
     )
-    logging.info(f"\n{yaml.dump(dict(config), default_flow_style=False)}")
+    logging.info("\n%s", yaml.dump(dict(config), default_flow_style=False))
 
 
 def main():
@@ -213,6 +212,8 @@ def main():
             training_config,
             alg_config,
         )
+
+        record.save()
 
 
 if __name__ == "__main__":
