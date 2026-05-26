@@ -80,8 +80,8 @@ class ReTD3Config(AlgorithmConfig):
     tau: Optional[float] = 0.005
 
 
-class RESACConfig(AlgorithmConfig):
-    algorithm: str = "RESAC"
+class ReSACConfig(AlgorithmConfig):
+    algorithm: str = "ReSAC"
 
     actor_lr: Optional[float] = 3e-4
     critic_lr: Optional[float] = 3e-4
