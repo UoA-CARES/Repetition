@@ -9,7 +9,7 @@ from utils.configurations import GymEnvironmentConfig
 
 
 
-class OpenAIEnvrionment(GymEnvironment):
+class OpenAIEnvironment(GymEnvironment):
     def __init__(self, config: GymEnvironmentConfig) -> None:
         super().__init__(config)
         self.env = gym.make(config.task, render_mode="rgb_array")
