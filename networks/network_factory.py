@@ -10,8 +10,8 @@ from algorithms.base.td3 import TD3
 from algorithms.repetition.resac import ReSAC
 from algorithms.repetition.retd3 import ReTD3
 
-from algorithms.sil.sil_sac import SILSAC
-from algorithms.sil.sil_td3 import SILTD3
+from algorithms.sil.sil_sac import SACSIL
+from algorithms.sil.sil_td3 import TD3SIL
 
 from networks.sac_networks import (
     Actor as SACActor,
