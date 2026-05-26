@@ -1,26 +1,21 @@
 """
 Main training entry point for Repetition-RL.
 
-Supported algorithms:
-    TD3
-    SAC
-    ReTD3
-    ReSAC
-    TD3SIL
-    SACSIL
+Example:
+    python train.py run --gym openai --task HalfCheetah-v4 TD3
 
-Supported repetition settings for now:
-    REPETITION_FRAMEWORK=NONE
-    REPETITION_FRAMEWORK=IER
-
-    SELECTION_STRATEGY=episode_reward
+IER example:
+    REPETITION_FRAMEWORK=IER SELECTION_STRATEGY=episode_reward \
+    python train.py run --gym openai --task HalfCheetah-v4 ReTD3
 """
 
+import argparse
 import logging
 import os
 import sys
 from datetime import datetime
 from pathlib import Path
+from utils.record import Record
 
 import torch
 import yaml
@@ -28,6 +23,7 @@ import yaml
 import train_loops.base.policy_loop as standard_policy_loop
 import train_loops.ier.episode_reward_loop as ier_episode_reward_loop
 
+from environments.environment_factory import EnvironmentFactory
 from memory import EpisodicMemory, ReplayBuffer
 from networks.network_factory import NetworkFactory
 from utils import helpers as hlp
@@ -45,6 +41,23 @@ from utils.configurations import (
 logging.basicConfig(level=logging.INFO)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train Repetition-RL agents.")
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    run_parser = subparsers.add_parser("run")
+
+    run_parser.add_argument("algorithm", type=str)
+
+    run_parser.add_argument("--gym", type=str, default="openai")
+    run_parser.add_argument("--task", type=str, default="Pendulum-v1")
+    run_parser.add_argument("--domain", type=str, default="")
+    run_parser.add_argument("--seeds", type=int, nargs="+", default=[10])
+
+    return parser.parse_args()
+
+
 def get_repetition_config():
     repetition_framework = os.getenv("REPETITION_FRAMEWORK", "NONE").upper()
     selection_strategy = os.getenv("SELECTION_STRATEGY", "episode_reward").lower()
@@ -52,9 +65,7 @@ def get_repetition_config():
     return repetition_framework, selection_strategy
 
 
-def get_algorithm_config():
-    algorithm = os.getenv("ALGORITHM", "TD3")
-
+def get_algorithm_config(algorithm):
     config_map = {
         "TD3": TD3Config,
         "SAC": SACConfig,
@@ -107,14 +118,16 @@ def log_config(title, config):
 
 
 def main():
+    args = parse_args()
+
     env_config = GymEnvironmentConfig(
-        task=os.getenv("TASK", "Pendulum-v1"),
-        gym=os.getenv("GYM", "gymnasium"),
-        domain=os.getenv("DOMAIN", ""),
+        task=args.task,
+        gym=args.gym,
+        domain=args.domain,
     )
 
-    training_config = TrainingConfig()
-    alg_config = get_algorithm_config()
+    training_config = TrainingConfig(seeds=args.seeds)
+    alg_config = get_algorithm_config(args.algorithm)
 
     training_loop, repetition_name = get_training_loop(alg_config)
 
@@ -140,6 +153,7 @@ def main():
     logging.info("REPETITION_FRAMEWORK: %s", repetition_framework)
     logging.info("SELECTION_STRATEGY: %s", selection_strategy)
     logging.info("Selected training loop: %s", repetition_name)
+    logging.info("Log directory: %s", glob_log_dir)
 
     logging.info(
         "Device: %s",
@@ -157,10 +171,7 @@ def main():
             logging.info("Terminating experiment. CUDA is not available.")
             sys.exit()
 
-    raise NotImplementedError(
-        "Environment creation is the next step. Add an independent "
-        "environment factory before running full experiments."
-    )
+    env_factory = EnvironmentFactory()
 
     for training_iteration, seed in enumerate(training_config.seeds):
         logging.info(
@@ -169,6 +180,8 @@ def main():
             len(training_config.seeds),
             seed,
         )
+
+        env = env_factory.create_environment(env_config)
 
         hlp.set_seed(seed)
         env.set_seed(seed)
@@ -182,7 +195,15 @@ def main():
 
         memory = get_memory(alg_config)
 
-        record = None
+        record = Record(
+            glob_log_dir=glob_log_dir,
+            log_dir=f"{seed}",
+            algorithm=alg_config.algorithm,
+            task=env_config.task,
+            network=agent,
+            plot_frequency=training_config.plot_frequency,
+            checkpoint_frequency=training_config.checkpoint_frequency,
+        )
 
         training_loop.policy_based_train(
             env,
