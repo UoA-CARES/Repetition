@@ -1,0 +1,219 @@
+"""
+Repetition Soft Actor-Critic (ReSAC).
+
+Original SAC paper:
+    https://arxiv.org/abs/1812.05905
+
+Code based on:
+    https://github.com/pranz24/pytorch-soft-actor-critic/blob/master/sac.py
+
+This implementation follows SAC with automatic entropy tuning, but trains from
+the short-term episode memory used by repetition-based RL methods.
+"""
+
+import copy
+import logging
+import os
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+
+
+class ReSAC:
+    """SAC variant for repetition-based RL."""
+
+    def __init__(
+        self,
+        actor_network: torch.nn.Module,
+        critic_network: torch.nn.Module,
+        gamma: float,
+        tau: float,
+        reward_scale: float,
+        action_num: int,
+        actor_lr: float,
+        critic_lr: float,
+        alpha_lr: float,
+        device: torch.device,
+    ):
+        self.type = "policy"
+        self.device = device
+
+        self.actor_net = actor_network.to(device)
+        self.critic_net = critic_network.to(device)
+        self.target_critic_net = copy.deepcopy(self.critic_net).to(device)
+
+        self.gamma = gamma
+        self.tau = tau
+        self.reward_scale = reward_scale
+
+        self.learn_counter = 0
+        self.policy_update_freq = 1
+
+        self.target_entropy = -action_num
+
+        self.actor_net_optimiser = torch.optim.Adam(
+            self.actor_net.parameters(),
+            lr=actor_lr,
+        )
+        self.critic_net_optimiser = torch.optim.Adam(
+            self.critic_net.parameters(),
+            lr=critic_lr,
+        )
+
+        init_temperature = 1.0
+        self.log_alpha = torch.tensor(np.log(init_temperature)).to(device)
+        self.log_alpha.requires_grad = True
+
+        self.log_alpha_optimizer = torch.optim.Adam(
+            [self.log_alpha],
+            lr=alpha_lr,
+        )
+
+    def select_action_from_policy(
+        self,
+        state: np.ndarray,
+        evaluation: bool = False,
+        noise_scale: float = 0,
+    ) -> np.ndarray:
+        """Select an action from the SAC policy."""
+
+        self.actor_net.eval()
+
+        with torch.no_grad():
+            state_tensor = torch.FloatTensor(state)
+            state_tensor = state_tensor.unsqueeze(0).to(self.device)
+
+            if evaluation:
+                _, _, action = self.actor_net(state_tensor)
+            else:
+                action, _, _ = self.actor_net(state_tensor)
+
+            action = action.cpu().data.numpy().flatten()
+
+        self.actor_net.train()
+
+        return action
+
+    @property
+    def alpha(self) -> torch.Tensor:
+        """Return entropy temperature alpha."""
+
+        return self.log_alpha.exp()
+
+    def train_policy(self, memory, batch_size: int) -> None:
+        """Train ReSAC using short-term episode memory."""
+
+        self.learn_counter += 1
+
+        experiences = memory.short_term_memory.sample_uniform(batch_size)
+
+        (
+            states,
+            actions,
+            rewards,
+            next_states,
+            dones,
+            episode_nums,
+            episode_steps,
+        ) = experiences
+
+        batch_size = len(states)
+
+        states = torch.FloatTensor(np.asarray(states)).to(self.device)
+        actions = torch.FloatTensor(np.asarray(actions)).to(self.device)
+        rewards = torch.FloatTensor(np.asarray(rewards)).to(self.device)
+        next_states = torch.FloatTensor(np.asarray(next_states)).to(self.device)
+        dones = torch.LongTensor(np.asarray(dones)).to(self.device)
+
+        rewards = rewards.unsqueeze(0).reshape(batch_size, 1)
+        dones = dones.unsqueeze(0).reshape(batch_size, 1)
+
+        with torch.no_grad():
+            next_actions, next_log_pi, _ = self.actor_net(next_states)
+
+            target_q_values_one, target_q_values_two = self.target_critic_net(
+                next_states,
+                next_actions,
+            )
+
+            target_q_values = (
+                torch.minimum(target_q_values_one, target_q_values_two)
+                - self.alpha * next_log_pi
+            )
+
+            q_target = (
+                rewards * self.reward_scale
+                + self.gamma * (1 - dones) * target_q_values
+            )
+
+        q_values_one, q_values_two = self.critic_net(states, actions)
+
+        critic_loss_one = F.mse_loss(q_values_one, q_target)
+        critic_loss_two = F.mse_loss(q_values_two, q_target)
+        critic_loss_total = critic_loss_one + critic_loss_two
+
+        self.critic_net_optimiser.zero_grad()
+        critic_loss_total.backward()
+        self.critic_net_optimiser.step()
+
+        pi, log_pi, _ = self.actor_net(states)
+
+        qf1_pi, qf2_pi = self.critic_net(states, pi)
+        min_qf_pi = torch.minimum(qf1_pi, qf2_pi)
+
+        actor_loss = ((self.alpha * log_pi) - min_qf_pi).mean()
+
+        self.actor_net_optimiser.zero_grad()
+        actor_loss.backward()
+        self.actor_net_optimiser.step()
+
+        alpha_loss = -(
+            self.log_alpha * (log_pi + self.target_entropy).detach()
+        ).mean()
+
+        self.log_alpha_optimizer.zero_grad()
+        alpha_loss.backward()
+        self.log_alpha_optimizer.step()
+
+        if self.learn_counter % self.policy_update_freq == 0:
+            self._soft_update_target_critic()
+
+    def _soft_update_target_critic(self) -> None:
+        """Soft-update the target critic network."""
+
+        for target_param, param in zip(
+            self.target_critic_net.parameters(),
+            self.critic_net.parameters(),
+        ):
+            target_param.data.copy_(
+                param.data * self.tau
+                + target_param.data * (1.0 - self.tau)
+            )
+
+    def save_models(self, filename: str, filepath: str = "models") -> None:
+        """Save actor and critic model parameters."""
+
+        path = f"{filepath}/models" if filepath != "models" else filepath
+
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        torch.save(self.actor_net.state_dict(), f"{path}/{filename}_actor.pht")
+        torch.save(self.critic_net.state_dict(), f"{path}/{filename}_critic.pht")
+
+        logging.info("ReSAC models have been saved.")
+
+    def load_models(self, filepath: str, filename: str) -> None:
+        """Load actor and critic model parameters."""
+
+        path = f"{filepath}/models" if filepath != "models" else filepath
+
+        self.actor_net.load_state_dict(
+            torch.load(f"{path}/{filename}_actor.pht")
+        )
+        self.critic_net.load_state_dict(
+            torch.load(f"{path}/{filename}_critic.pht")
+        )
+
+        logging.info("ReSAC models have been loaded.")
