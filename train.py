@@ -136,7 +136,11 @@ def get_training_loop(alg_config):
             import train_loops.ser.mser.mixed_reward_loop as loop
 
             return loop, "mser_mixed"
+        
+        if selection_strategy == "simple_mixed":
+            import train_loops.ser.mser.simple_mixed_reward_loop as loop
 
+            return loop, "mser_simple_mixed"
         raise ValueError(f"Unknown SER selection strategy: {selection_strategy}")
 
     raise ValueError(
