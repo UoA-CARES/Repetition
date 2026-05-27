@@ -99,14 +99,19 @@ def policy_based_train(
     episode_start = time.time()
 
     for total_step_counter in range(int(max_steps_training)):
+
+        if total_step_counter % 100 == 0:
+            logging.info("Training step %s", total_step_counter)
+
         episode_timesteps += 1
 
         if total_step_counter < max_steps_exploration:
-            logging.info(
-                "Running exploration step %s/%s",
-                total_step_counter + 1,
-                max_steps_exploration,
-            )
+            if total_step_counter % 100 == 0:
+		    logging.info(
+		        "Running exploration step %s/%s",
+		        total_step_counter + 1,
+		        max_steps_exploration,
+		    )
 
             action_env = env.sample_action()
 
