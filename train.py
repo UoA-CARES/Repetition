@@ -1,15 +1,5 @@
 """
 Main training entry point for Repetition-RL.
-
-Example:
-    python train.py run --gym openai --task HalfCheetah-v4 TD3
-
-SIL example:
-    python train.py run --gym openai --task HalfCheetah-v4 TD3SIL
-
-IER example:
-    REPETITION_FRAMEWORK=IER SELECTION_STRATEGY=episode_reward \
-    python train.py run --gym openai --task HalfCheetah-v4 ReTD3
 """
 
 import argparse
@@ -41,7 +31,7 @@ from utils.configurations import (
 )
 from utils.record import Record
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, force=True)
 
 
 def parse_args():
@@ -101,7 +91,7 @@ def get_training_loop(alg_config):
 
         raise ValueError(
             f"{alg_config.algorithm} requires REPETITION_FRAMEWORK=IER "
-            "and SELECTION_STRATEGY=episode_reward for now."
+            "and SELECTION_STRATEGY=episode_reward."
         )
 
     return standard_policy_loop, "standard"
@@ -128,12 +118,12 @@ def main():
     training_config = TrainingConfig(seeds=args.seeds)
     alg_config = get_algorithm_config(args.algorithm)
 
-    training_loop, repetition_name = get_training_loop(alg_config)
+    training_loop, loop_name = get_training_loop(alg_config)
 
     iterations_folder = (
         f"{alg_config.algorithm}-{env_config.task}-"
         f"{datetime.now().strftime('%y_%m_%d_%H-%M-%S')}-"
-        f"{repetition_name}"
+        f"{loop_name}"
     )
 
     glob_log_dir = f"{Path.home()}/repetition_rl_logs/{iterations_folder}"
@@ -151,9 +141,8 @@ def main():
     )
     logging.info("REPETITION_FRAMEWORK: %s", repetition_framework)
     logging.info("SELECTION_STRATEGY: %s", selection_strategy)
-    logging.info("Selected training loop: %s", repetition_name)
+    logging.info("Selected training loop: %s", loop_name)
     logging.info("Log directory: %s", glob_log_dir)
-
     logging.info(
         "Device: %s",
         torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -203,6 +192,10 @@ def main():
             plot_frequency=training_config.plot_frequency,
             checkpoint_frequency=training_config.checkpoint_frequency,
         )
+
+        record.save_config(env_config, "env_config")
+        record.save_config(training_config, "train_config")
+        record.save_config(alg_config, "alg_config")
 
         training_loop.policy_based_train(
             env,
