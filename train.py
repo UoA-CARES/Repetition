@@ -1,5 +1,26 @@
 """
 Main training entry point for Repetition-RL.
+
+Examples:
+    python3 train.py run --gym openai --task HalfCheetah-v4 TD3
+    python3 train.py run --gym openai --task HalfCheetah-v4 SAC
+    python3 train.py run --gym openai --task HalfCheetah-v4 TD3SIL
+    python3 train.py run --gym openai --task HalfCheetah-v4 SACSIL
+
+    REPETITION_FRAMEWORK=IER SELECTION_STRATEGY=episode_reward \
+    python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
+
+    REPETITION_FRAMEWORK=IER SELECTION_STRATEGY=transition_reward \
+    python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
+
+    REPETITION_FRAMEWORK=SER SELECTION_STRATEGY=episode_reward \
+    python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
+
+    REPETITION_FRAMEWORK=SER SELECTION_STRATEGY=transition_reward \
+    python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
+
+    REPETITION_FRAMEWORK=SER SELECTION_STRATEGY=mixed \
+    python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
 """
 
 import argparse
@@ -13,7 +34,6 @@ import torch
 import yaml
 
 import train_loops.base.policy_loop as standard_policy_loop
-import train_loops.ier.episode_reward_loop as ier_episode_reward_loop
 
 from environments.environment_factory import EnvironmentFactory
 from memory import EpisodicMemory, ReplayBuffer
@@ -60,10 +80,10 @@ def get_algorithm_config(algorithm):
     config_map = {
         "TD3": TD3Config,
         "SAC": SACConfig,
-        "ReTD3": ReTD3Config,
-        "ReSAC": ReSACConfig,
         "TD3SIL": TD3SILConfig,
         "SACSIL": SACSILConfig,
+        "ReTD3": ReTD3Config,
+        "ReSAC": ReSACConfig,
     }
 
     if algorithm not in config_map:
@@ -85,16 +105,44 @@ def get_memory(alg_config):
 def get_training_loop(alg_config):
     repetition_framework, selection_strategy = get_repetition_config()
 
-    if alg_config.algorithm in ["ReTD3", "ReSAC"]:
-        if repetition_framework == "IER" and selection_strategy == "episode_reward":
-            return ier_episode_reward_loop, "ier_episode_reward"
+    if alg_config.algorithm not in ["ReTD3", "ReSAC"]:
+        return standard_policy_loop, "standard"
 
-        raise ValueError(
-            f"{alg_config.algorithm} requires REPETITION_FRAMEWORK=IER "
-            "and SELECTION_STRATEGY=episode_reward."
-        )
+    if repetition_framework == "IER":
+        if selection_strategy == "episode_reward":
+            import train_loops.ier.episode_reward_loop as loop
 
-    return standard_policy_loop, "standard"
+            return loop, "ier_episode_reward"
+
+        if selection_strategy == "transition_reward":
+            import train_loops.ier.transition_reward_loop as loop
+
+            return loop, "ier_transition_reward"
+
+        raise ValueError(f"Unknown IER selection strategy: {selection_strategy}")
+
+    if repetition_framework == "SER":
+        if selection_strategy == "episode_reward":
+            import train_loops.ser.eser.episode_reward_loop as loop
+
+            return loop, "eser_episode_reward"
+
+        if selection_strategy == "transition_reward":
+            import train_loops.ser.xser.transition_reward_loop as loop
+
+            return loop, "xser_transition_reward"
+
+        if selection_strategy == "mixed":
+            import train_loops.ser.mser.mixed_reward_loop as loop
+
+            return loop, "mser_mixed"
+
+        raise ValueError(f"Unknown SER selection strategy: {selection_strategy}")
+
+    raise ValueError(
+        f"{alg_config.algorithm} is a repetition algorithm. "
+        "Set REPETITION_FRAMEWORK=IER or REPETITION_FRAMEWORK=SER."
+    )
 
 
 def log_config(title, config):
@@ -143,6 +191,7 @@ def main():
     logging.info("SELECTION_STRATEGY: %s", selection_strategy)
     logging.info("Selected training loop: %s", loop_name)
     logging.info("Log directory: %s", glob_log_dir)
+
     logging.info(
         "Device: %s",
         torch.device("cuda" if torch.cuda.is_available() else "cpu"),
