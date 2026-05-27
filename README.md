@@ -7,7 +7,6 @@ Repetition-RL is a research framework that introduces **repetition as a third mo
 
 - Exploration
 - Exploitation
-- Repetition
 
 Instead of relying solely on replay-buffer sampling, agents actively re-execute previously successful action sequences during interaction to reinforce valuable behaviours and improve sample efficiency.
 
