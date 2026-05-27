@@ -93,10 +93,10 @@ class NetworkFactory:
             )
 
         # =========================================================
-        # SILTD3
+        # TD3SIL
         # =========================================================
 
-        if algorithm_name == "SILTD3":
+        if algorithm_name == "TD3SIL":
 
             actor = TD3Actor(
                 observation_size,
@@ -108,7 +108,7 @@ class NetworkFactory:
                 action_num,
             )
 
-            return SILTD3(
+            return TD3SIL(
                 actor_network=actor,
                 critic_network=critic,
                 gamma=config.gamma,
@@ -181,7 +181,7 @@ class NetworkFactory:
         # SILSAC
         # =========================================================
 
-        if algorithm_name == "SILSAC":
+        if algorithm_name == "SACSIL":
 
             actor = SACActor(
                 observation_size,
@@ -193,7 +193,7 @@ class NetworkFactory:
                 action_num,
             )
 
-            return SILSAC(
+            return SACSIL(
                 actor_network=actor,
                 critic_network=critic,
                 gamma=config.gamma,
