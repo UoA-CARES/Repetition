@@ -1,4 +1,4 @@
-# Repetition
+# Repetition-RL
 
 <p align="center">
   <img src="assets/exploration-explotation-repetition.png" width="90%">
@@ -10,39 +10,40 @@
 
 ---
 
-## Overview
+# Overview
 
-`Repetition-RL` is a research framework for studying **repetition as a third mode of interaction** in RL.
+`Repetition` is a reinforcement learning research framework that introduces **repetition as a third mode of interaction** alongside:
 
-Standard RL agents usually interact with the environment through two main modes:
+* Exploration
+* Exploitation
 
-1. **Exploration**: trying actions to discover useful behaviours.
-2. **Exploitation**: using the current policy to maximise return.
+Traditional off-policy RL algorithms reuse past experiences only during optimisation through replay-buffer sampling. In contrast, Repetition directly modifies the interaction process itself by allowing agents to deliberately re-execute previously valuable behaviours in the environment.
 
-This repository adds a third interaction mode:
+The framework studies how repeating successful trajectories during interaction can improve:
 
-3. **Repetition**: deliberately re-executing previously valuable action sequences during environment interaction.
+* sample efficiency
+* behavioural consolidation
+* exploration guidance
+* stability of learning
 
-The key idea is that valuable behaviour should not only be reused inside the replay buffer during optimisation. It can also be reused directly in the environment by repeating trajectories that were useful before.
+This repository includes implementations of:
 
-This repository supports:
+* **IER**: Instant Episode Repetition
+* **SER**: Spaced Episode Repetition
 
-- Standard TD3 and SAC
-- SIL variants
-- Repetition-based TD3 and SAC
-- Instant Episode Repetition
-- Spaced Episode Repetition
-- Episode-reward, transition-reward, and mixed selection strategies
+  * **ESER**: Episode-based SER
+  * **XSER**: Transition-based SER
+  * **MSER**: Mixed SER
+
+The framework is evaluated on continuous-control RL benchmarks and robotic manipulation tasks.
 
 ---
 
 # Research Paper
 
-This repository is associated with the journal paper:
+This repository accompanies the journal paper:
 
 > **Beyond Exploration and Exploitation: Repetition as a Third Mode of Interaction in Reinforcement Learning**
-
-Citation placeholder:
 
 ```bibtex
 @article{yamani2026repetition,
@@ -57,237 +58,178 @@ Citation placeholder:
 
 # Core Idea
 
-In standard off-policy RL, past experiences are reused through sampling from a replay buffer. This helps the optimisation process, but it does not directly affect how the agent behaves during environment interaction.
+In standard RL, agents alternate between:
 
-In contrast, repetition modifies the interaction process itself.
+1. **Exploration**
 
-Instead of only asking:
+   * discovering new behaviours
 
-> Which transition should be sampled for training?
+2. **Exploitation**
 
-Repetition also asks:
+   * following the current policy
 
-> Which valuable behaviour should the agent re-execute in the environment?
+This work introduces:
 
-This makes repetition different from replay-buffer sampling. Replay is an optimisation mechanism. Repetition is an interaction mechanism.
+3. **Repetition**
+
+   * deliberate re-execution of previously successful behaviours
+
+Unlike replay buffers that only reuse transitions during gradient optimisation, repetition changes how the agent interacts with the environment itself.
+
+<p align="center">
+  <img src="assets/exploration-explotation-repetition.png" width="90%">
+</p>
 
 ---
 
 # Methods
 
-## 1. Instant Episode Repetition (IER)
+# Instant Episode Repetition (IER)
 
 <p align="center">
   <img src="assets/IER.png" width="80%">
 </p>
 
-IER repeats a valuable episode soon after it is discovered.
+IER immediately repeats newly discovered valuable episodes.
 
-The agent first interacts normally with the environment. When a useful trajectory is detected, the algorithm stores the corresponding action sequence and immediately re-executes it for a small number of repetitions.
+When a useful trajectory is detected, the corresponding action sequence is re-executed directly in the environment for several repetitions.
 
-### Why IER?
+## Key Characteristics
 
-IER is useful when a good behaviour appears briefly and may be difficult to rediscover. Instead of waiting for the replay buffer to indirectly reinforce it, IER repeats the behaviour directly.
+* immediate behavioural reinforcement
+* no additional episodic memory required
+* lightweight integration into off-policy RL
+* suitable for fast-learning environments
 
-### IER selection strategies
+## IER Selection Strategies
 
-This repository supports two IER selection strategies:
+### Episode-Reward IER
 
-#### IER with episode reward
+Episodes are selected using cumulative episode reward.
 
-The episode is selected based on total episode return. This is useful when the whole trajectory is globally successful.
+This reinforces globally successful trajectories.
 
-Run:
+### Transition-Reward IER
 
-```bash
-REPETITION_FRAMEWORK=IER \
-SELECTION_STRATEGY=episode_reward \
-python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
-```
+Episodes are selected using high local transition rewards.
 
-#### IER with transition reward
-
-The episode is selected based on a high local transition reward. This is useful when a locally important event happens inside an episode, even if the full episode return is not the best.
-
-Run:
-
-```bash
-REPETITION_FRAMEWORK=IER \
-SELECTION_STRATEGY=transition_reward \
-python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
-```
+This captures locally important experiences even when the full episode return is not optimal.
 
 ---
 
-## 2. Spaced Episode Repetition (SER)
+# Spaced Episode Repetition (SER)
 
 <p align="center">
   <img src="assets/SER.png" width="85%">
 </p>
 
-SER repeats valuable episodes after a delay rather than immediately.
-
-SER uses a long-term episodic memory called:
+SER introduces delayed behavioural reuse through a long-term episodic memory called:
 
 > **Virtual Episode Memory (VEM)**
 
-The VEM stores valuable episodes and periodically provides action sequences for repetition.
+Instead of repeating trajectories immediately, SER periodically revisits valuable episodes according to a repetition schedule.
 
-### Why SER?
+## Why SER?
 
-IER repeats an episode immediately. SER introduces spacing between discovery and repetition. This is inspired by the idea that delayed reuse can help consolidate useful behaviours over time and prevent the agent from relying only on very recent experience.
+SER separates discovery and reuse over time.
+
+This enables:
+
+* delayed behavioural consolidation
+* periodic trajectory reinforcement
+* long-term reuse of important behaviours
+* reduced dependence on recent experience only
 
 ---
 
 # SER Variants
 
-## ESER: Episode-based SER
+# ESER
 
-ESER selects episodes according to cumulative episode reward.
+## Episode-Based SER
+
+<p align="center">
+  <img src="assets/ESER.png" width="45%">
+</p>
+
+ESER stores episodes according to cumulative episode reward:
 
 ```math
 R_i^{ep} > R_{max}^{ep}
 ```
 
-This means that complete episodes with high return are stored in VEM and later repeated.
-<p align="center">
-  <img src="assets/ESER.png" width="45%">
-</p>
-
-### When ESER is useful
-
-ESER is useful when success depends on the full trajectory rather than one isolated transition.
-
-Example command:
-
-```bash
-REPETITION_FRAMEWORK=SER \
-SELECTION_STRATEGY=episode_reward \
-python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
-```
+The method prioritises globally successful trajectories across the entire episode.
 
 ---
 
-## XSER: Transition-based SER
+# XSER
 
-XSER selects episodes according to high local transition reward.
+## Transition-Based SER
 
 <p align="center">
   <img src="assets/XSER.png" width="45%">
 </p>
 
-Instead of using only total episode reward, XSER stores episodes that contain a locally valuable transition.
+XSER selects episodes using locally important transition rewards.
 
-### When XSER is useful
+Instead of relying only on total episode return, XSER captures trajectories containing important local events.
 
-XSER is useful when important learning signals are sparse or local. For example, a useful contact, movement, or reward event may occur inside an otherwise weak episode.
-
-Example command:
-
-```bash
-REPETITION_FRAMEWORK=SER \
-SELECTION_STRATEGY=transition_reward \
-python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
-```
+This is useful when sparse or local rewards are important for learning.
 
 ---
 
-## MSER: Mixed SER
+# MSER
 
-MSER combines both ESER and XSER.
+## Mixed SER
 
 <p align="center">
   <img src="assets/MIXSER.png" width="60%">
 </p>
 
-MSER stores and repeats episodes selected by:
+MSER combines:
 
-- global episode reward
-- local transition reward
+* global episode-reward selection
+* local transition-reward selection
 
-This allows the agent to preserve both globally successful behaviours and locally important experiences.
+This enables the framework to preserve:
 
-Example command:
+* globally successful trajectories
+* locally salient experiences
 
-```bash
-REPETITION_FRAMEWORK=SER \
-SELECTION_STRATEGY=mixed \
-python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
-```
+Two mixed variants are included:
 
-A simple mixed version is also supported:
-
-```bash
-REPETITION_FRAMEWORK=SER \
-SELECTION_STRATEGY=simple_mixed \
-python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
-```
+* `mixed`
+* `simple_mixed`
 
 ---
 
 # Repository Structure
 
 ```text
-repetition-rl/
+Repetition/
 │
 ├── algorithms/
-│   ├── base/
-│   │   ├── td3.py
-│   │   └── sac.py
-│   │
-│   ├── repetition/
-│   │   ├── retd3.py
-│   │   └── resac.py
-│   │
-│   └── sil/
-│       ├── sil_td3.py
-│       └── sil_sac.py
-│
 ├── networks/
-│   ├── td3_networks.py
-│   ├── sac_networks.py
-│   └── network_factory.py
-│
 ├── memory/
-│   ├── replay_buffer.py
-│   ├── episodic_memory.py
-│   ├── prioritized_replay_buffer.py
-│   ├── sum_tree.py
-│   └── memory_factory.py
-│
-├── train_loops/
-│   ├── base/
-│   │   └── policy_loop.py
-│   │
-│   ├── ier/
-│   │   ├── episode_reward_loop.py
-│   │   └── transition_reward_loop.py
-│   │
-│   └── ser/
-│       ├── eser/
-│       │   └── episode_reward_loop.py
-│       │
-│       ├── xser/
-│       │   └── transition_reward_loop.py
-│       │
-│       └── mser/
-│           ├── mixed_reward_loop.py
-│           └── simple_mixed_reward_loop.py
-│
 ├── environments/
-│   ├── mujoco/
-│   ├── dm_control/
-│   └── wrappers/
+├── train_loops/
+│
+├── train_loops/base/
+├── train_loops/ier/
+├── train_loops/ser/
+│   ├── eser/
+│   ├── xser/
+│   └── mser/
+│
+├── configs/
+│   ├── standard/
+│   ├── ier/
+│   └── ser/
 │
 ├── utils/
-│   ├── configurations.py
-│   ├── helpers.py
-│   ├── record.py
-│   └── plotter.py
-│
-├── assets/
-├── results/
 ├── analysis/
+├── results/
+├── assets/
 ├── docs/
 ├── train.py
 └── requirements.txt
@@ -297,39 +239,53 @@ repetition-rl/
 
 # Supported Algorithms
 
-## Standard RL
-
-| Algorithm | Description |
-|---|---|
-| TD3 | Twin Delayed Deep Deterministic Policy Gradient |
-| SAC | Soft Actor-Critic |
-
-## Self-Imitation Learning
-
-| Algorithm | Description |
-|---|---|
-| TD3SIL | TD3 with self-imitation learning |
-| SACSIL | SAC with self-imitation learning |
-
-## Repetition-Based RL
-
-| Algorithm | Description |
-|---|---|
-| ReTD3 | TD3 with repetition-based interaction |
-| ReSAC | SAC with repetition-based interaction |
+| Algorithm | Description                                     |
+| --------- | ----------------------------------------------- |
+| TD3       | Twin Delayed Deep Deterministic Policy Gradient |
+| SAC       | Soft Actor-Critic                               |
+| TD3SIL    | TD3 with Self-Imitation Learning                |
+| SACSIL    | SAC with Self-Imitation Learning                |
+| ReTD3     | Repetition-based TD3                            |
+| ReSAC     | Repetition-based SAC                            |
 
 ---
 
 # Supported Repetition Modes
 
-| Framework | Strategy | Method |
-|---|---|---|
-| IER | episode_reward | IER with episode reward selection |
-| IER | transition_reward | IER with transition reward selection |
-| SER | episode_reward | ESER |
-| SER | transition_reward | XSER |
-| SER | mixed | MSER |
-| SER | simple_mixed | Simple MSER |
+| Framework | Strategy          | Description                                        |
+| --------- | ----------------- | -------------------------------------------------- |
+| IER       | episode_reward    | Immediate repetition using episode return          |
+| IER       | transition_reward | Immediate repetition using local transition reward |
+| SER       | episode_reward    | ESER                                               |
+| SER       | transition_reward | XSER                                               |
+| SER       | mixed             | MSER                                               |
+| SER       | simple_mixed      | Simple MSER                                        |
+
+---
+
+# Environments
+
+## MuJoCo / OpenAI Gym
+
+* Ant-v4
+* HalfCheetah-v4
+* Humanoid-v4
+* Walker2d-v4
+* Hopper-v4
+* Pendulum-v1
+
+## DeepMind Control Suite
+
+* Walker-Walk
+* Cheetah-Run
+* Cartpole-Swingup
+* Finger-Turn-Hard
+* Reacher-Hard
+
+## Real-World Robotics
+
+* Dynamic Object Translation
+* Two-finger robotic manipulation platform
 
 ---
 
@@ -338,15 +294,17 @@ repetition-rl/
 Clone the repository:
 
 ```bash
-git clone https://github.com/UoA-CARES/repetition-rl.git
-cd repetition-rl
+git clone https://github.com/UoA-CARES/Repetition.git
+
+cd Repetition
 ```
 
-Create an environment:
+Create environment:
 
 ```bash
-conda create -n repetition-rl python=3.10
-conda activate repetition-rl
+conda create -n Repetition python=3.10
+
+conda activate Repetition
 ```
 
 Install dependencies:
@@ -359,248 +317,95 @@ pip install -r requirements.txt
 
 # Running Experiments
 
-The main entry point is:
+Experiments are configured using YAML files.
+
+The main command is:
 
 ```bash
-python3 train.py run --gym <environment_backend> --task <task_name> <algorithm>
-```
-
-Example:
-
-```bash
-python3 train.py run --gym openai --task HalfCheetah-v4 TD3
+python3 train.py run --config <config_path>
 ```
 
 ---
 
-# Standard Training Commands
+# Standard RL
 
 ## TD3
 
 ```bash
 python3 train.py run \
---seeds 10 \
---gym openai \
---task HalfCheetah-v4 \
-TD3
+--config configs/standard/td3_halfcheetah.yaml
 ```
 
 ## SAC
 
 ```bash
 python3 train.py run \
---seeds 10 \
---gym openai \
---task HalfCheetah-v4 \
-SAC
+--config configs/standard/sac_halfcheetah.yaml
 ```
 
 ---
 
-# SIL Training Commands
+# IER Experiments
 
-## TD3SIL
+## Episode-Reward IER
 
 ```bash
 python3 train.py run \
---seeds 10 \
---gym openai \
---task HalfCheetah-v4 \
-TD3SIL
+--config configs/ier/retd3_episode_reward.yaml
 ```
 
-## SACSIL
+## Transition-Reward IER
 
 ```bash
 python3 train.py run \
---seeds 10 \
---gym openai \
---task HalfCheetah-v4 \
-SACSIL
+--config configs/ier/retd3_transition_reward.yaml
 ```
 
 ---
 
-# IER Training Commands
-
-## IER with TD3
-
-```bash
-REPETITION_FRAMEWORK=IER \
-SELECTION_STRATEGY=episode_reward \
-python3 train.py run \
---seeds 10 \
---gym openai \
---task HalfCheetah-v4 \
-ReTD3
-```
-
-## IER with SAC
-
-```bash
-REPETITION_FRAMEWORK=IER \
-SELECTION_STRATEGY=episode_reward \
-python3 train.py run \
---seeds 10 \
---gym openai \
---task HalfCheetah-v4 \
-ReSAC
-```
-
-## IER transition reward
-
-```bash
-REPETITION_FRAMEWORK=IER \
-SELECTION_STRATEGY=transition_reward \
-python3 train.py run \
---seeds 10 \
---gym openai \
---task HalfCheetah-v4 \
-ReTD3
-```
-
----
-
-# SER Training Commands
+# SER Experiments
 
 ## ESER
 
 ```bash
-REPETITION_FRAMEWORK=SER \
-SELECTION_STRATEGY=episode_reward \
 python3 train.py run \
---seeds 10 \
---gym openai \
---task HalfCheetah-v4 \
-ReTD3
+--config configs/ser/eser_retd3.yaml
 ```
 
 ## XSER
 
 ```bash
-REPETITION_FRAMEWORK=SER \
-SELECTION_STRATEGY=transition_reward \
 python3 train.py run \
---seeds 10 \
---gym openai \
---task HalfCheetah-v4 \
-ReTD3
+--config configs/ser/xser_retd3.yaml
 ```
 
 ## MSER
 
 ```bash
-REPETITION_FRAMEWORK=SER \
-SELECTION_STRATEGY=mixed \
 python3 train.py run \
---seeds 10 \
---gym openai \
---task HalfCheetah-v4 \
-ReTD3
+--config configs/ser/mser_retd3.yaml
 ```
 
 ## Simple MSER
 
 ```bash
-REPETITION_FRAMEWORK=SER \
-SELECTION_STRATEGY=simple_mixed \
 python3 train.py run \
---seeds 10 \
---gym openai \
---task HalfCheetah-v4 \
-ReTD3
+--config configs/ser/simple_mser_retd3.yaml
 ```
 
 ---
 
-# Multiple Seeds
+# YAML Configuration Structure
 
-```bash
-python3 train.py run \
---seeds 10 20 30 40 50 \
---gym openai \
---task HalfCheetah-v4 \
-TD3
-```
-
----
-
-# Quick Debug Runs
-
-Use `Pendulum-v1` for quick testing:
-
-```bash
-python3 train.py run \
---seeds 10 \
---gym openai \
---task Pendulum-v1 \
-TD3
-```
-
-IER debug:
-
-```bash
-REPETITION_FRAMEWORK=IER \
-SELECTION_STRATEGY=episode_reward \
-python3 train.py run \
---seeds 10 \
---gym openai \
---task Pendulum-v1 \
-ReTD3
-```
-
-SER debug:
-
-```bash
-REPETITION_FRAMEWORK=SER \
-SELECTION_STRATEGY=mixed \
-python3 train.py run \
---seeds 10 \
---gym openai \
---task Pendulum-v1 \
-ReTD3
-```
-
----
-
-# YAML Configuration Files
-
-The current runner mainly uses command-line arguments and configuration classes in:
-
-```text
-utils/configurations.py
-```
-
-However, YAML files can be added to make experiments easier to reproduce.
-
-Recommended structure:
-
-```text
-configs/
-├── standard/
-│   ├── td3_halfcheetah.yaml
-│   └── sac_halfcheetah.yaml
-│
-├── ier/
-│   ├── retd3_episode_reward.yaml
-│   └── retd3_transition_reward.yaml
-│
-└── ser/
-    ├── eser_retd3.yaml
-    ├── xser_retd3.yaml
-    ├── mser_retd3.yaml
-    └── simple_mser_retd3.yaml
-```
-
----
-
-## Example YAML: Standard TD3
+Example configuration:
 
 ```yaml
 experiment:
-  name: td3_halfcheetah
-  framework: NONE
-  selection_strategy: none
+  name: mser_retd3_halfcheetah
+
+repetition:
+  framework: SER
+  selection_strategy: mixed
 
 environment:
   gym: openai
@@ -608,64 +413,59 @@ environment:
   domain: ""
 
 algorithm:
-  name: TD3
-  actor_lr: 0.0003
-  critic_lr: 0.0003
-  gamma: 0.99
-  tau: 0.005
+  name: ReTD3
 
 training:
   seeds: [10, 20, 30, 40, 50]
-  max_steps_training: 1000000
-  max_steps_exploration: 1000
-  batch_size: 256
-  gradient_steps: 1
-  number_steps_per_evaluation: 10000
-  number_eval_episodes: 10
 ```
-
-# Recommended Future YAML Runner
-
-Later, the training command can be simplified to:
-
-```bash
-python3 train.py run --config configs/ser/mser_retd3.yaml
-```
-
-A small YAML parser can read:
-
-- environment settings
-- algorithm settings
-- training settings
-- repetition settings
-
-and set the correct `REPETITION_FRAMEWORK` and `SELECTION_STRATEGY` automatically.
 
 ---
 
-# Output Logs
+# Logging and Outputs
 
-Experiment outputs are saved under:
+Training outputs are automatically stored under:
 
 ```text
 ~/repetition_rl_logs/
 ```
 
-Each run stores:
+Each experiment saves:
 
 ```text
 env_config.json
 train_config.json
 alg_config.json
-data/train.csv
-data/eval.csv
+
+data/
 models/
 figures/
 videos/
 ```
 
+---
 
+# Features
+
+* repetition-based environment interaction
+* Virtual Episode Memory (VEM)
+* episode-level behavioural reuse
+* TD3 and SAC integration
+* SER and IER frameworks
+* mixed repetition strategies
+* delayed repetition scheduling
+* robotic manipulation evaluation
+* heatmap and sensitivity analysis
+* replay-buffer compatible design
+
+---
+
+# Acknowledgements
+
+This work was developed within the CARES Robotics Lab at the University of Auckland.
+
+---
 
 # License
 
 MIT License
+
