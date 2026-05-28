@@ -57,10 +57,6 @@ Citation placeholder:
 
 # Core Idea
 
-<p align="center">
-  <img src="assets/exploration-explotation-repetition.png" width="90%">
-</p>
-
 In standard off-policy RL, past experiences are reused through sampling from a replay buffer. This helps the optimisation process, but it does not directly affect how the agent behaves during environment interaction.
 
 In contrast, repetition modifies the interaction process itself.
