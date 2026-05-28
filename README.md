@@ -197,7 +197,7 @@ python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
 MSER combines both ESER and XSER.
 
 <p align="center">
-  <img src="aassets/MIXSER.png" width="60%">
+  <img src="assets/MIXSER.png" width="60%">
 </p>
 
 MSER stores and repeats episodes selected by:
