@@ -76,10 +76,6 @@ This work introduces:
 
 Unlike replay buffers that only reuse transitions during gradient optimisation, repetition changes how the agent interacts with the environment itself.
 
-<p align="center">
-  <img src="assets/exploration-explotation-repetition.png" width="90%">
-</p>
-
 ---
 
 # Methods
