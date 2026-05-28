@@ -1,4 +1,4 @@
-# Repetition-RL
+# Repetition
 
 <p align="center">
   <img src="assets/exploration-explotation-repetition.png" width="90%">
