@@ -21,6 +21,8 @@ Examples:
 
     REPETITION_FRAMEWORK=SER SELECTION_STRATEGY=mixed \
     python3 train.py run --gym openai --task HalfCheetah-v4 ReTD3
+
+    python3 train.py run --config configs/ser/mser_retd3.yaml
 """
 
 import argparse
@@ -60,13 +62,20 @@ def parse_args():
     subparsers = parser.add_subparsers(dest="command", required=True)
     run_parser = subparsers.add_parser("run")
 
-    run_parser.add_argument("algorithm", type=str)
+    run_parser.add_argument("algorithm", nargs="?", default=None)
+    run_parser.add_argument("--config", type=str, default=None)
+
     run_parser.add_argument("--gym", type=str, default="openai")
     run_parser.add_argument("--task", type=str, default="Pendulum-v1")
     run_parser.add_argument("--domain", type=str, default="")
     run_parser.add_argument("--seeds", type=int, nargs="+", default=[10])
 
     return parser.parse_args()
+
+
+def load_yaml_config(config_path):
+    with open(config_path, "r", encoding="utf-8") as file:
+        return yaml.safe_load(file)
 
 
 def get_repetition_config():
@@ -136,17 +145,71 @@ def get_training_loop(alg_config):
             import train_loops.ser.mser.mixed_reward_loop as loop
 
             return loop, "mser_mixed"
-        
+
         if selection_strategy == "simple_mixed":
             import train_loops.ser.mser.simple_mixed_reward_loop as loop
 
             return loop, "mser_simple_mixed"
+
         raise ValueError(f"Unknown SER selection strategy: {selection_strategy}")
 
     raise ValueError(
         f"{alg_config.algorithm} is a repetition algorithm. "
         "Set REPETITION_FRAMEWORK=IER or REPETITION_FRAMEWORK=SER."
     )
+
+
+def build_configs_from_yaml(config_path):
+    yaml_config = load_yaml_config(config_path)
+
+    experiment_cfg = yaml_config.get("experiment", {})
+    environment_cfg = yaml_config.get("environment", {})
+    algorithm_cfg = yaml_config.get("algorithm", {})
+    training_cfg = yaml_config.get("training", {})
+
+    framework = experiment_cfg.get("framework", "NONE")
+    selection_strategy = experiment_cfg.get(
+        "selection_strategy",
+        "episode_reward",
+    )
+
+    os.environ["REPETITION_FRAMEWORK"] = str(framework).upper()
+    os.environ["SELECTION_STRATEGY"] = str(selection_strategy).lower()
+
+    env_config = GymEnvironmentConfig(
+        task=environment_cfg.get("task", "Pendulum-v1"),
+        gym=environment_cfg.get("gym", "openai"),
+        domain=environment_cfg.get("domain", ""),
+    )
+
+    training_config = TrainingConfig(
+        seeds=training_cfg.get("seeds", [10]),
+    )
+
+    algorithm_name = algorithm_cfg.get("name")
+
+    if algorithm_name is None:
+        raise ValueError("Algorithm name missing in YAML config.")
+
+    alg_config = get_algorithm_config(algorithm_name)
+
+    return env_config, training_config, alg_config
+
+
+def build_configs_from_cli(args):
+    if args.algorithm is None:
+        raise ValueError("Algorithm is required when not using --config.")
+
+    env_config = GymEnvironmentConfig(
+        task=args.task,
+        gym=args.gym,
+        domain=args.domain,
+    )
+
+    training_config = TrainingConfig(seeds=args.seeds)
+    alg_config = get_algorithm_config(args.algorithm)
+
+    return env_config, training_config, alg_config
 
 
 def log_config(title, config):
@@ -161,14 +224,10 @@ def log_config(title, config):
 def main():
     args = parse_args()
 
-    env_config = GymEnvironmentConfig(
-        task=args.task,
-        gym=args.gym,
-        domain=args.domain,
-    )
-
-    training_config = TrainingConfig(seeds=args.seeds)
-    alg_config = get_algorithm_config(args.algorithm)
+    if args.config is not None:
+        env_config, training_config, alg_config = build_configs_from_yaml(args.config)
+    else:
+        env_config, training_config, alg_config = build_configs_from_cli(args)
 
     training_loop, loop_name = get_training_loop(alg_config)
 
