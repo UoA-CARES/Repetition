@@ -1,0 +1,15 @@
+experiment:
+  name: td3_halfcheetah
+  framework: NONE
+  selection_strategy: none
+
+environment:
+  gym: openai
+  task: HalfCheetah-v4
+  domain: ""
+
+algorithm:
+  name: TD3
+
+training:
+  seeds: [10]

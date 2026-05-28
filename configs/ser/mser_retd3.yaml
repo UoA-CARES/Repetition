@@ -1,0 +1,15 @@
+experiment:
+  name: mser_retd3_halfcheetah
+  framework: SER
+  selection_strategy: mixed
+
+environment:
+  gym: openai
+  task: HalfCheetah-v4
+  domain: ""
+
+algorithm:
+  name: ReTD3
+
+training:
+  seeds: [10]
