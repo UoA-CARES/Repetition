@@ -37,22 +37,7 @@ This repository includes implementations of:
 
 The framework is evaluated on continuous-control RL benchmarks and robotic manipulation tasks.
 
----
 
-# Research Paper
-
-This repository accompanies the journal paper:
-
-> **Beyond Exploration and Exploitation: Repetition as a Third Mode of Interaction in Reinforcement Learning**
-
-```bibtex
-@article{yamani2026repetition,
-  title={Beyond Exploration and Exploitation: Repetition as a Third Mode of Interaction in Reinforcement Learning},
-  author={Yamani, Hoda and MacDonald, Bruce and Williams, Henry},
-  journal={Under Review},
-  year={2026}
-}
-```
 
 ---
 
